@@ -31,3 +31,5 @@ export async function startVoiceTrack(room: Room) {
     source: Track.Source.Microphone
   });
 }
+
+// Helper: you can similarly publish camera tracks with Track.Source.Camera if needed
