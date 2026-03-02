@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+body {
+  @apply min-h-screen bg-ink-950 text-slate-100 antialiased;
+  background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.08), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(248, 113, 113, 0.08), transparent 22%),
+    radial-gradient(circle at 50% 70%, rgba(129, 140, 248, 0.12), transparent 28%),
+    #020617;
+}
+
+.glass {
+  @apply bg-white/5 border border-white/10 backdrop-blur-glass shadow-glass;
+}
+
+.card {
+  @apply glass rounded-2xl p-4;
+}
+
+.accent-ring {
+  @apply ring-2 ring-cyan-400/50 ring-offset-2 ring-offset-ink-950;
+}
+
+.lock-badge {
+  @apply inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200;
+}
+
+@keyframes wave {
+  0% {
+    transform: scaleY(0.8);
+  }
+  50% {
+    transform: scaleY(1.4);
+  }
+  100% {
+    transform: scaleY(0.8);
+  }
+}
