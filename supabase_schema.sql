@@ -57,6 +57,18 @@ create table if not exists public.messages (
 alter table public.messages enable row level security;
 create index if not exists messages_thread_idx on public.messages (thread_id, created_at desc);
 
+-- Message receipts per participant
+create table if not exists public.message_receipts (
+  message_id uuid references public.messages on delete cascade,
+  user_id uuid references public.profiles on delete cascade,
+  state text default 'delivered' check (state in ('delivered','read')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  primary key (message_id, user_id)
+);
+alter table public.message_receipts enable row level security;
+create index if not exists receipts_message_idx on public.message_receipts (message_id);
+
 -- Call invites for ringing + notifications
 create table if not exists public.call_invites (
   id uuid primary key default gen_random_uuid(),
@@ -118,10 +130,8 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if new.status in ('delivered','read') then
-    delete from public.messages where id = new.id;
-  end if;
-  return null;
+  -- Disabled hard-delete by status; receipts handle deletion.
+  return new;
 end;
 $$;
 
@@ -129,6 +139,36 @@ drop trigger if exists purge_message_after_delivery on public.messages;
 create trigger purge_message_after_delivery
 after update of status on public.messages
 for each row execute function public.purge_message_after_delivery();
+
+-- Delete message when all participants have at least delivered
+create or replace function public.auto_delete_when_all_delivered()
+returns trigger
+language plpgsql
+as $$
+declare
+  participant_count integer;
+  delivered_count integer;
+begin
+  select count(*) into participant_count
+  from public.thread_participants tp
+  join public.messages m on m.thread_id = tp.thread_id
+  where m.id = new.message_id;
+
+  select count(*) into delivered_count
+  from public.message_receipts r
+  where r.message_id = new.message_id and r.state in ('delivered','read');
+
+  if delivered_count >= participant_count then
+    delete from public.messages where id = new.message_id;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists delete_when_all_delivered on public.message_receipts;
+create trigger delete_when_all_delivered
+after insert or update of state on public.message_receipts
+for each row execute function public.auto_delete_when_all_delivered();
 
 -- RLS policies
 -- profiles
@@ -182,3 +222,23 @@ create policy "Insert call invite if caller"
   on public.call_invites for insert with check (auth.uid() = caller_id);
 create policy "Update call invite if participant"
   on public.call_invites for update using (auth.uid() in (caller_id, callee_id));
+
+-- message_receipts RLS
+create policy "Read receipts as participant"
+  on public.message_receipts for select using (
+    exists(
+      select 1 from public.messages m
+      join public.thread_participants tp on tp.thread_id = m.thread_id
+      where m.id = message_id and tp.user_id = auth.uid()
+    )
+  );
+create policy "Insert receipt if participant"
+  on public.message_receipts for insert with check (
+    exists(
+      select 1 from public.messages m
+      join public.thread_participants tp on tp.thread_id = m.thread_id
+      where m.id = message_id and tp.user_id = auth.uid() and user_id = auth.uid()
+    )
+  );
+create policy "Update own receipt"
+  on public.message_receipts for update using (auth.uid() = user_id);

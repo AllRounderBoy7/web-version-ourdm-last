@@ -30,11 +30,16 @@ export function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, threadId]);
 
-  // Mark incoming messages as read to trigger server-side purge; Dexie keeps local copy
+  // Mark incoming messages as read (for receipts) while keeping local cache
   useEffect(() => {
     if (!threadId || !user) return;
     const foreign = messages.filter((m) => m.thread_id === threadId && m.sender_id !== user.id);
-    foreign.forEach((m) => supabase.from("messages").update({ status: "read" }).eq("id", m.id));
+    foreign.forEach((m) =>
+      supabase
+        .from("message_receipts")
+        .upsert({ message_id: m.id, user_id: user.id, state: "read" })
+        .then(() => supabase.from("messages").update({ status: "read" }).eq("id", m.id))
+    );
   }, [messages, threadId, user]);
 
   useEffect(() => {
@@ -102,6 +107,11 @@ export function ChatPage() {
             }
           ]);
           if (msg.sender_id !== user?.id) {
+            supabase.from("message_receipts").upsert({
+              message_id: msg.id,
+              user_id: user?.id,
+              state: "delivered"
+            });
             supabase.from("messages").update({ status: "delivered" }).eq("id", msg.id);
             notifyIncoming(msg);
           }
@@ -151,6 +161,12 @@ export function ChatPage() {
         createdAt: data.created_at
       }
     ]);
+    // mark sender receipt as seen
+    await supabase.from("message_receipts").upsert({
+      message_id: (data as Message).id,
+      user_id: user.id,
+      state: "read"
+    });
   };
 
   const handleTextSend = (text: string) => sendMessage("text", text);
