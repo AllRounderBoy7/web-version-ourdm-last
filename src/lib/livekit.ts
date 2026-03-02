@@ -1,4 +1,4 @@
-import { Room, RoomEvent, RemoteParticipant, createLocalTracks, TrackSource } from "livekit-client";
+import { Room, Track, createLocalTracks } from "livekit-client";
 
 export async function fetchLiveKitToken(roomName: string, identity: string) {
   const res = await fetch(
@@ -28,6 +28,6 @@ export async function joinLiveKitRoom(roomName: string, identity: string) {
 export async function startVoiceTrack(room: Room) {
   const [audioTrack] = await createLocalTracks({ audio: true });
   await room.localParticipant.publishTrack(audioTrack, {
-    source: TrackSource.Microphone
+    source: Track.Source.Microphone
   });
 }
