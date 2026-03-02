@@ -29,10 +29,10 @@ export function CallBar({ roomName, identity, peerId, peerName }: Props) {
       if (room) {
         room.disconnect();
       }
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
-  }, [room]);
-
-    channelRef.current && supabase.removeChannel(channelRef.current);
   }, [room]);
 
   const watchInvite = (id: string) => {
